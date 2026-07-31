@@ -25,6 +25,13 @@ When wrapping an existing call that genuinely needs several independent paramete
 It acts as an observable replacement for a local `try`/`catch` and can wrap any expression. The trade-off is that
 the primary operation and fallback remain at the call site, so the code is more verbose.
 
+### Reuse configured instances
+
+Create each `FallbackCase` or `ResilientOperation` once and reuse it for all executions of the same logical
+operation. In an application, keep it in a long-lived `val`—for example, a singleton, service, or dependency
+injection component—instead of rebuilding it at every call. Reuse keeps the configuration in one place and
+avoids unnecessary allocation of builders and fallback rules.
+
 ### Same use case: one input
 
 For a product lookup that needs only a `ProductId`, all three approaches are possible. A plain `try`/`catch`
@@ -142,6 +149,14 @@ observer(
     ),
 )
 ```
+
+### Metric cardinality
+
+When a `FallbackObserver` exports `caseName` as a metric tag, it must come from a small, bounded set of stable
+logical operation names, such as `product.load` or `cache.refresh`. Do not build a case name from request IDs,
+user IDs, tenant IDs, product IDs, URLs, or exception messages. Those values create high-cardinality metrics,
+which can increase monitoring cost and degrade query performance. Put that contextual information in logs or
+traces instead.
 
 ## License
 

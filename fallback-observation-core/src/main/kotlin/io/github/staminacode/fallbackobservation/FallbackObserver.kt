@@ -2,6 +2,13 @@ package io.github.staminacode.fallbackobservation
 
 import org.slf4j.LoggerFactory
 
+/**
+ * Describes a fallback that is about to be executed.
+ *
+ * @property caseName A stable, logical fallback name. When an observer exports this value as a metric tag,
+ * use a small, bounded set of names such as `product.load`. Do not include request IDs, user IDs, tenant IDs,
+ * or other unbounded values, as they create high-cardinality metrics.
+ */
 data class FallbackEvent(
     val caseName: String,
     val exception: Exception,

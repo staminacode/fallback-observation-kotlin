@@ -6,6 +6,10 @@ package io.github.staminacode.fallbackobservation
  * Both functions are supplied when this object is built, then the operation can be invoked repeatedly with
  * different [I] values. Use [FallbackCase] when the operation and fallback functions should instead be
  * supplied at each call site.
+ *
+ * Create an operation once and reuse it, typically as a long-lived `val` or singleton. Do not create a new
+ * operation for every invocation; its configuration is intended to be shared by all executions of the same
+ * logical operation.
  */
 class ResilientOperation<I, O> internal constructor(
     private val rules: FallbackRules,
@@ -16,6 +20,13 @@ class ResilientOperation<I, O> internal constructor(
     operator fun invoke(input: I): O = rules.execute({ operation(input) }) { fallback(input, it) }
 }
 
+/**
+ * Configures a named resilient operation.
+ *
+ * The name supplied to [resilientOperation] must be stable and low-cardinality when exported as a metric tag.
+ * Use a logical operation name such as `product.load`; never include request IDs, user IDs, tenant IDs, or
+ * other unbounded values.
+ */
 class ResilientOperationBuilder<I, O> internal constructor() : AbstractFallbackBuilder() {
     private var configuredOperation: ((I) -> O)? = null
     private var configuredFallback: ((I, Exception) -> O)? = null
@@ -37,7 +48,12 @@ class ResilientOperationBuilder<I, O> internal constructor() : AbstractFallbackB
     )
 }
 
-/** Creates a [ResilientOperation] with its functions and exception-handling rules configured once. */
+/**
+ * Creates a [ResilientOperation] with its functions and exception-handling rules configured once.
+ *
+ * Keep [name] stable and low-cardinality when a metric observer is used. It identifies a logical operation,
+ * not an individual request, user, tenant, or resource.
+ */
 fun <I, O> resilientOperation(
     name: String,
     configure: ResilientOperationBuilder<I, O>.() -> Unit,
