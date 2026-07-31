@@ -10,7 +10,7 @@ package io.github.staminacode.fallbackobservation
 class ResilientOperation<I, O> internal constructor(
     private val rules: FallbackRules,
     private val operation: (I) -> O,
-    private val fallback: (I, Throwable) -> O,
+    private val fallback: (I, Exception) -> O,
 ) {
     /** Executes the configured operation for [input], applying the configured fallback rules. */
     operator fun invoke(input: I): O = rules.execute({ operation(input) }) { fallback(input, it) }
@@ -18,14 +18,14 @@ class ResilientOperation<I, O> internal constructor(
 
 class ResilientOperationBuilder<I, O> internal constructor() : AbstractFallbackBuilder() {
     private var configuredOperation: ((I) -> O)? = null
-    private var configuredFallback: ((I, Throwable) -> O)? = null
+    private var configuredFallback: ((I, Exception) -> O)? = null
 
     fun operation(operation: (I) -> O) {
         check(configuredOperation == null) { "Operation has already been configured" }
         configuredOperation = operation
     }
 
-    fun fallback(fallback: (I, Throwable) -> O) {
+    fun fallback(fallback: (I, Exception) -> O) {
         check(configuredFallback == null) { "Fallback has already been configured" }
         configuredFallback = fallback
     }

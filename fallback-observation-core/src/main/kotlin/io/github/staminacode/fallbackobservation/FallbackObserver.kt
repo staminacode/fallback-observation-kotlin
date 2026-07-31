@@ -4,7 +4,7 @@ import org.slf4j.LoggerFactory
 
 data class FallbackEvent(
     val caseName: String,
-    val exception: Throwable,
+    val exception: Exception,
 )
 
 fun interface FallbackObserver {

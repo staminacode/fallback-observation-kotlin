@@ -3,19 +3,19 @@ package io.github.staminacode.fallbackobservation
 import kotlin.reflect.KClass
 
 abstract class AbstractFallbackBuilder {
-    private val handledExceptions = linkedSetOf<KClass<out Throwable>>()
-    private val passThroughExceptions = linkedSetOf<KClass<out Throwable>>()
+    private val handledExceptions = linkedSetOf<KClass<out Exception>>()
+    private val passThroughExceptions = linkedSetOf<KClass<out Exception>>()
     private var fallbackObserver: FallbackObserver = FallbackObserver.DEFAULT
 
-    inline fun <reified E : Throwable> handle() = handle(E::class)
+    inline fun <reified E : Exception> handle() = handle(E::class)
 
-    fun handle(exceptionType: KClass<out Throwable>) {
+    fun handle(exceptionType: KClass<out Exception>) {
         handledExceptions += exceptionType
     }
 
-    inline fun <reified E : Throwable> passThrough() = passThrough(E::class)
+    inline fun <reified E : Exception> passThrough() = passThrough(E::class)
 
-    fun passThrough(exceptionType: KClass<out Throwable>) {
+    fun passThrough(exceptionType: KClass<out Exception>) {
         passThroughExceptions += exceptionType
     }
 

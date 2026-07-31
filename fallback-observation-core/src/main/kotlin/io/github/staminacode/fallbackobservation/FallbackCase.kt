@@ -13,7 +13,7 @@ class FallbackCase internal constructor(private val rules: FallbackRules) {
      *
      * Pass-through and unhandled exceptions are rethrown.
      */
-    fun <O> withFallback(operation: () -> O, fallback: (Throwable) -> O): O =
+    fun <O> withFallback(operation: () -> O, fallback: (Exception) -> O): O =
         rules.execute(operation, fallback)
 }
 
