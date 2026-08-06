@@ -63,10 +63,11 @@ class FallbackCaseTest {
   @Test
   fun `notifies observer before executing fallback`() {
     val events = mutableListOf<FallbackEvent>()
+    val customFallbackRegistry = FallbackObserverRegistry({ events += it })
+    val customFallbackFactory = FallbackFactory(customFallbackRegistry)
     val fallbackCase =
-        fallbackFactory.fallbackCase("product.load") {
+        customFallbackFactory.fallbackCase("product.load") {
           handle<IOException>()
-          // observer { events += it } TODO: fix this
         }
     val exception = IOException("Unavailable")
     fallbackCase.withFallback({ throw exception }, { "cached" })

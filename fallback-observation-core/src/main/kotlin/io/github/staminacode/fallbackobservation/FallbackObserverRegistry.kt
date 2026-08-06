@@ -10,6 +10,8 @@ package io.github.staminacode.fallbackobservation
 class FallbackObserverRegistry(
     observers: Collection<FallbackObserver> = listOf(FallbackObserver.LOGGING)
 ) {
+  constructor(observer: FallbackObserver) : this(listOf(observer))
+
   internal fun onFallback(fallbackEvent: FallbackEvent) {
     observers.forEach { observer -> observer.onFallback(fallbackEvent) }
   }
