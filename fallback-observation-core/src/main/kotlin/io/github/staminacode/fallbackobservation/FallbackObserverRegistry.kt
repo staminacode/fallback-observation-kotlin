@@ -1,20 +1,36 @@
 package io.github.staminacode.fallbackobservation
 
+import java.util.concurrent.CopyOnWriteArrayList
+
 /**
- * This is used to keep track of the observers to be used in such a way that we don't have to
- * enforce a singleton from the lib.
+ * Holds the observers notified when a fallback is executed.
  *
- * TODO: update this comment, which currently is more intended for the lib development and not for
- *   the use
+ * A registry is typically shared by the [FallbackFactory] and all fallback policies created from
+ * it. Observers can be registered temporarily, for example by a test extension.
  */
 class FallbackObserverRegistry(
     observers: Collection<FallbackObserver> = listOf(FallbackObserver.LOGGING)
 ) {
   constructor(observer: FallbackObserver) : this(listOf(observer))
 
+  /**
+   * Registers [observer] and returns a handle that removes it when closed.
+   *
+   * The registration is safe to use while fallbacks are being executed.
+   */
+  fun register(observer: FallbackObserver): FallbackObserverRegistration {
+    observers += observer
+    return FallbackObserverRegistration { observers.remove(observer) }
+  }
+
   internal fun onFallback(fallbackEvent: FallbackEvent) {
     observers.forEach { observer -> observer.onFallback(fallbackEvent) }
   }
 
-  private val observers = mutableListOf(*observers.toTypedArray())
+  private val observers = CopyOnWriteArrayList(observers)
+}
+
+/** Removes a previously registered [FallbackObserver]. */
+fun interface FallbackObserverRegistration : AutoCloseable {
+  override fun close()
 }
