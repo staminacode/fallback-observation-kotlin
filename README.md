@@ -5,6 +5,8 @@
 ## Modules
 
 - `fallback-observation-core` contains the fallback API and observer contracts.
+- [`fallback-observation-junit`](fallback-observation-junit/README.md) verifies fallback execution in
+  JUnit Jupiter tests.
 - `fallback-observation-micrometer` provides a Micrometer-backed `FallbackObserver`.
 
 ## `FallbackCase` vs. `ResilientOperation`
@@ -139,15 +141,37 @@ Use `ResilientOperation<Unit, Output>` for operations without input, then call i
 
 `FallbackObserver` receives a `FallbackEvent` immediately before fallback execution. By default, the core module logs the fallback at warning level, including the triggering exception, through SLF4J. The library includes only `slf4j-api`; the consuming application chooses the logging provider (for example, Logback, Log4j2, or the JUL provider). Configure `FallbackObserver.NO_OP` only when observation should be disabled explicitly.
 
-The Micrometer module records a `fallback.executions` counter tagged with `fallback.case` and `exception`. Use `CompositeFallbackObserver` to retain the default logging observer while adding metrics:
+### `FallbackObserverRegistry`
+
+`FallbackObserverRegistry` owns the observers used by the `FallbackFactory` and all
+`FallbackCase` and `ResilientOperation` instances created by that factory. Create the registry and
+factory once as part of the application object graph:
 
 ```kotlin
-observer(
-    CompositeFallbackObserver(
+val observerRegistry = FallbackObserverRegistry(
+    listOf(
         FallbackObserver.LOGGING,
         MicrometerFallbackObserver(meterRegistry),
     ),
 )
+
+val fallbackFactory = FallbackFactory(observerRegistry)
+```
+
+The Micrometer observer records a `fallback.executions` counter tagged with `fallback.case` and
+`exception`.
+
+Observers can also be registered temporarily. `register` returns an `AutoCloseable` handle that
+removes only that observer when closed. This is useful for scoped integrations such as the JUnit
+extension:
+
+```kotlin
+val registration = observerRegistry.register(auditObserver)
+try {
+    // Execute work observed by auditObserver.
+} finally {
+    registration.close()
+}
 ```
 
 ### Metric cardinality
@@ -157,6 +181,11 @@ logical operation names, such as `product.load` or `cache.refresh`. Do not build
 user IDs, tenant IDs, product IDs, URLs, or exception messages. Those values create high-cardinality metrics,
 which can increase monitoring cost and degrade query performance. Put that contextual information in logs or
 traces instead.
+
+## Testing
+
+The [JUnit module](fallback-observation-junit/README.md) provides `NoUnexpectedFallbacksExtension` for
+verifying the exact fallback cases and execution counts exercised by a test.
 
 ## License
 
