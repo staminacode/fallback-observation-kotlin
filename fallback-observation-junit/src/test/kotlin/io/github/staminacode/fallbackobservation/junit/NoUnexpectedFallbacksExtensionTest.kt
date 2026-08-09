@@ -30,6 +30,43 @@ class NoUnexpectedFallbacksExtensionTest {
   }
 
   @Test
+  fun `passes a test that executes its expected fallback once`() {
+    execute(ExpectedFallbackFixture::class.java).testEvents().assertStatistics { statistics ->
+      statistics.started(1).succeeded(1)
+    }
+  }
+
+  @Test
+  fun `fails when an expected fallback is not executed`() {
+    execute(MissingExpectedFallbackFixture::class.java).testEvents().assertStatistics { statistics
+      ->
+      statistics.started(1).failed(1)
+    }
+  }
+
+  @Test
+  fun `passes when an expected fallback executes the declared number of times`() {
+    execute(ExpectedFallbackTwiceFixture::class.java).testEvents().assertStatistics { statistics ->
+      statistics.started(1).succeeded(1)
+    }
+  }
+
+  @Test
+  fun `fails when a fallback executes more times than expected`() {
+    execute(TooManyFallbacksFixture::class.java).testEvents().assertStatistics { statistics ->
+      statistics.started(1).failed(1)
+    }
+  }
+
+  @Test
+  fun `supports programmatic expectations`() {
+    execute(ProgrammaticExpectationFixture::class.java).testEvents().assertStatistics { statistics
+      ->
+      statistics.started(1).succeeded(1)
+    }
+  }
+
+  @Test
   fun `rejects parallel execution by default`() {
     execute(ParallelExecutionFixture::class.java, parallelExecutionEnabled = true)
         .testEvents()
@@ -92,6 +129,97 @@ class NoUnexpectedFallbacksExtensionTest {
   }
 
   @Tag("engine-testkit-fixture")
+  class ExpectedFallbackFixture {
+    companion object {
+      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+
+      @JvmField
+      @RegisterExtension
+      val noUnexpectedFallbacks = NoUnexpectedFallbacksExtension(registry)
+
+      val operation = fallbackOperation(registry)
+    }
+
+    @Test
+    @ExpectedFallback("product.load")
+    fun executesExpectedFallback() {
+      operation()
+    }
+  }
+
+  @Tag("engine-testkit-fixture")
+  class MissingExpectedFallbackFixture {
+    companion object {
+      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+
+      @JvmField
+      @RegisterExtension
+      val noUnexpectedFallbacks = NoUnexpectedFallbacksExtension(registry)
+    }
+
+    @Test @ExpectedFallback("product.load") fun doesNotExecuteFallback() = Unit
+  }
+
+  @Tag("engine-testkit-fixture")
+  class ExpectedFallbackTwiceFixture {
+    companion object {
+      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+
+      @JvmField
+      @RegisterExtension
+      val noUnexpectedFallbacks = NoUnexpectedFallbacksExtension(registry)
+
+      val operation = fallbackOperation(registry)
+    }
+
+    @Test
+    @ExpectedFallback("product.load", times = 2)
+    fun executesExpectedFallbackTwice() {
+      operation()
+      operation()
+    }
+  }
+
+  @Tag("engine-testkit-fixture")
+  class TooManyFallbacksFixture {
+    companion object {
+      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+
+      @JvmField
+      @RegisterExtension
+      val noUnexpectedFallbacks = NoUnexpectedFallbacksExtension(registry)
+
+      val operation = fallbackOperation(registry)
+    }
+
+    @Test
+    @ExpectedFallback("product.load")
+    fun executesFallbackTwice() {
+      operation()
+      operation()
+    }
+  }
+
+  @Tag("engine-testkit-fixture")
+  class ProgrammaticExpectationFixture {
+    companion object {
+      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+
+      @JvmField
+      @RegisterExtension
+      val noUnexpectedFallbacks = NoUnexpectedFallbacksExtension(registry)
+
+      val operation = fallbackOperation(registry)
+    }
+
+    @Test
+    fun executesProgrammaticallyExpectedFallback(expectations: FallbackExpectations) {
+      expectations.expect("product.load")
+      operation()
+    }
+  }
+
+  @Tag("engine-testkit-fixture")
   class ParallelExecutionFixture {
     companion object {
       @JvmField
@@ -116,5 +244,14 @@ class NoUnexpectedFallbacksExtensionTest {
     }
 
     @Test fun succeeds() = Unit
+  }
+
+  private companion object {
+    fun fallbackOperation(registry: FallbackObserverRegistry) =
+        FallbackFactory(registry).resilientOperation<Unit, String>("product.load") {
+          operation { throw IOException("Unavailable") }
+          fallback { _, _ -> "cached" }
+          handle<IOException>()
+        }
   }
 }
