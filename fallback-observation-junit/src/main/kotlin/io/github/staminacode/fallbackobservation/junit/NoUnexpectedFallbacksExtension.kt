@@ -4,12 +4,12 @@ import io.github.staminacode.fallbackobservation.FallbackEvent
 import io.github.staminacode.fallbackobservation.FallbackObserver
 import io.github.staminacode.fallbackobservation.FallbackObserverRegistration
 import io.github.staminacode.fallbackobservation.FallbackObserverRegistry
+import kotlin.jvm.optionals.getOrDefault
 import org.junit.jupiter.api.Constants.PARALLEL_EXECUTION_ENABLED_PROPERTY_NAME
 import org.junit.jupiter.api.extension.AfterEachCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionConfigurationException
 import org.junit.jupiter.api.extension.ExtensionContext
-import kotlin.jvm.optionals.getOrDefault
 
 /**
  * Fails a test when a fallback is executed through [observerRegistry].
