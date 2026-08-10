@@ -49,8 +49,13 @@ class NoUnexpectedFallbacksExtension(
     observation.registration.close()
 
     val expectedCounts = observation.expectations.counts()
-    if (!matches(expectedCounts, observation.observer.events)) {
-      throw FallbackVerificationError(expectedCounts, observation.observer.events)
+    if (!matches(expectedCounts, observation.observer.observations)) {
+      throw FallbackVerificationError(
+          expectedCounts = expectedCounts,
+          observedEvents = observation.observer.observations.map(ObservedFallback::event),
+          observationStackTraces =
+              observation.observer.observations.map(ObservedFallback::stackTrace),
+      )
     }
   }
 
@@ -108,10 +113,10 @@ class NoUnexpectedFallbacksExtension(
       context.getStore(NAMESPACE).get(REGISTRATION_KEY, TestObservation::class.java)
 
   private class CollectingFallbackObserver : FallbackObserver {
-    val events = mutableListOf<FallbackEvent>()
+    val observations = mutableListOf<ObservedFallback>()
 
     override fun onFallback(event: FallbackEvent) {
-      events += event
+      observations += ObservedFallback(event, Exception("Fallback observed here"))
     }
   }
 
@@ -128,18 +133,33 @@ class NoUnexpectedFallbacksExtension(
 }
 
 /** Indicates that the observed fallbacks did not match a test's expectations. */
-class FallbackVerificationError(expectedCounts: Map<String, Int>, events: List<FallbackEvent>) :
-    AssertionError(fallbackVerificationMessage(expectedCounts, events))
+class FallbackVerificationError
+internal constructor(
+    expectedCounts: Map<String, Int>,
+    observedEvents: List<FallbackEvent>,
+    observationStackTraces: List<Throwable>,
+) : AssertionError(fallbackVerificationMessage(expectedCounts, observedEvents)) {
+  init {
+    observationStackTraces.forEach(::addSuppressed)
+  }
+}
 
-private fun matches(expectedCounts: Map<String, Int>, events: List<FallbackEvent>): Boolean =
-    expectedCounts == events.groupingBy(FallbackEvent::caseName).eachCount()
+private data class ObservedFallback(
+    val event: FallbackEvent,
+    val stackTrace: Throwable,
+)
+
+private fun matches(
+    expectedCounts: Map<String, Int>,
+    observations: List<ObservedFallback>,
+): Boolean = expectedCounts == observations.groupingBy { it.event.caseName }.eachCount()
 
 private fun fallbackVerificationMessage(
     expectedCounts: Map<String, Int>,
-    events: List<FallbackEvent>,
+    observedEvents: List<FallbackEvent>,
 ): String = buildString {
   append("Fallback verification failed:")
-  val observedCounts = events.groupingBy(FallbackEvent::caseName).eachCount()
+  val observedCounts = observedEvents.groupingBy { it.caseName }.eachCount()
 
   (observedCounts.keys - expectedCounts.keys).forEach { caseName ->
     append("\n- Unexpected fallback '")

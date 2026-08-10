@@ -62,7 +62,9 @@ fun `refreshes the cache after loading a product`() {
 ```
 
 The extension fails the test when a fallback is unexpected, expected but not executed, or executed
-more or fewer times than declared.
+more or fewer times than declared. For each observed fallback, its verification error also includes
+a suppressed stack trace captured at the moment the fallback was observed, which points to the code
+path that triggered it.
 
 ## Dynamic expectations
 

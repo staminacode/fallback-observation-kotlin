@@ -6,10 +6,13 @@ import io.github.staminacode.fallbackobservation.FallbackObserverRegistry
 import io.github.staminacode.fallbackobservation.invoke
 import java.io.IOException
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Constants.PARALLEL_EXECUTION_ENABLED_PROPERTY_NAME
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.discovery.DiscoverySelectors.selectClass
 import org.junit.platform.testkit.engine.EngineTestKit
 
@@ -27,6 +30,20 @@ class NoUnexpectedFallbacksExtensionTest {
     execute(UnexpectedFallbackFixture::class.java).testEvents().assertStatistics { statistics ->
       statistics.started(1).failed(1)
     }
+  }
+
+  @Test
+  fun `includes the fallback stack trace in the verification error`() {
+    val error =
+        assertIs<FallbackVerificationError>(failureOf(UnexpectedFallbackFixture::class.java))
+
+    assertEquals(1, error.suppressed.size)
+    assertEquals("Fallback observed here", error.suppressed.single().message)
+    assertTrue(
+        error.suppressed.single().stackTrace.any {
+          it.className.endsWith("UnexpectedFallbackFixture") && it.methodName == "executesFallback"
+        }
+    )
   }
 
   @Test
@@ -88,6 +105,12 @@ class NoUnexpectedFallbacksExtensionTest {
               parallelExecutionEnabled.toString(),
           )
           .execute()
+
+  private fun failureOf(testClass: Class<*>): Throwable {
+    val event = execute(testClass).testEvents().failed().list().single()
+    val result = event.payload.orElseThrow() as TestExecutionResult
+    return result.throwable.orElseThrow()
+  }
 
   @Tag("engine-testkit-fixture")
   class PassingFixture {
