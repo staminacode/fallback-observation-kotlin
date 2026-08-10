@@ -1,6 +1,7 @@
 package io.github.staminacode.fallbackobservation
 
 import java.util.concurrent.CopyOnWriteArrayList
+import org.slf4j.LoggerFactory
 
 /**
  * Holds the observers notified about fallback-related operation outcomes.
@@ -32,16 +33,52 @@ class FallbackObserverRegistry(
     return FallbackObserverRegistration { remove(observer) }
   }
 
-  internal fun onFallback(fallbackEvent: FallbackEvent) {
-    fallbackObservers.forEach { observer -> observer.onFallback(fallbackEvent) }
+  /** Records that a fallback is about to be executed for [caseName]. */
+  fun recordFallback(caseName: String, exception: Exception) {
+    requireCaseName(caseName)
+    fallbackObservers.forEach { observer ->
+      observer.onFallback(FallbackEvent(caseName, exception))
+    }
   }
 
-  internal fun onSuccess(successEvent: OperationSuccessEvent) {
-    fallbackAwareOperationObservers.forEach { observer -> observer.onSuccess(successEvent) }
+  /** Records a successful primary operation for observers interested in operation outcomes. */
+  fun recordSuccess(caseName: String) {
+    requireCaseName(caseName)
+    fallbackAwareOperationObservers.forEach { observer ->
+      observer.onSuccess(OperationSuccessEvent(caseName))
+    }
   }
 
-  internal fun onError(errorEvent: OperationErrorEvent) {
-    operationObservers.forEach { observer -> observer.onError(errorEvent) }
+  /** Records an error that escaped without a successful fallback result. */
+  fun recordError(caseName: String, exception: Exception) {
+    requireCaseName(caseName)
+    operationObservers.forEach { observer ->
+      observer.onError(OperationErrorEvent(caseName, exception))
+    }
+  }
+
+  /**
+   * Records a fallback that failed while executing.
+   *
+   * The [fallbackException] is logged, while observers receive the original [primaryException] with
+   * `fallbackFailed = true`.
+   */
+  fun recordFallbackFailure(
+      caseName: String,
+      primaryException: Exception,
+      fallbackException: Exception,
+  ) {
+    requireCaseName(caseName)
+    logger.error(
+        "Fallback failed for case={}; rethrowing the original exception",
+        caseName,
+        fallbackException,
+    )
+    operationObservers.forEach { observer ->
+      observer.onError(
+          OperationErrorEvent(caseName, primaryException, fallbackFailed = true),
+      )
+    }
   }
 
   private fun add(observer: FallbackObserver) {
@@ -62,6 +99,14 @@ class FallbackObserverRegistry(
     if (observer is OperationObserver) {
       operationObservers.remove(observer)
     }
+  }
+
+  private fun requireCaseName(caseName: String) {
+    require(caseName.isNotBlank()) { "Fallback case name cannot be blank" }
+  }
+
+  private companion object {
+    private val logger = LoggerFactory.getLogger(FallbackObserverRegistry::class.java)
   }
 }
 

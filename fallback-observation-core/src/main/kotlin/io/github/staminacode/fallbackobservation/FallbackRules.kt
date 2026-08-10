@@ -1,7 +1,6 @@
 package io.github.staminacode.fallbackobservation
 
 import kotlin.reflect.KClass
-import org.slf4j.LoggerFactory
 
 internal class FallbackRules(
     private val caseName: String,
@@ -17,7 +16,7 @@ internal class FallbackRules(
           return recover(exception, fallback)
         }
 
-    observerRegistry.onSuccess(OperationSuccessEvent(caseName))
+    observerRegistry.recordSuccess(caseName)
     return result
   }
 
@@ -29,22 +28,17 @@ internal class FallbackRules(
       }
 
   private fun <O> executeFallback(exception: Exception, fallback: (Exception) -> O): O {
-    observerRegistry.onFallback(FallbackEvent(caseName, exception))
+    observerRegistry.recordFallback(caseName, exception)
     return try {
       fallback(exception)
     } catch (fallbackException: Exception) {
-      logger.error(
-          "Fallback failed for case={}; rethrowing the original exception",
-          caseName,
-          fallbackException,
-      )
-      observerRegistry.onError(OperationErrorEvent(caseName, exception, fallbackFailed = true))
+      observerRegistry.recordFallbackFailure(caseName, exception, fallbackException)
       throw exception
     }
   }
 
   private fun rethrow(exception: Exception): Nothing {
-    observerRegistry.onError(OperationErrorEvent(caseName, exception))
+    observerRegistry.recordError(caseName, exception)
     throw exception
   }
 
@@ -52,5 +46,3 @@ internal class FallbackRules(
     it.isInstance(this)
   }
 }
-
-private val logger = LoggerFactory.getLogger(FallbackRules::class.java)

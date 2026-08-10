@@ -152,6 +152,34 @@ This keeps the default observation lightweight. For example, a fallback-rate obs
 can implement `OperationObserver`. If a fallback function itself fails, the original primary
 exception is reported with `fallbackFailed = true` and rethrown; the fallback exception is logged.
 
+### Manual `try`/`catch`
+
+Use the registry directly when a local `try`/`catch` is a better fit than a reusable policy. The
+manual calls notify the same observers used by `FallbackCase` and `ResilientOperation`:
+
+```kotlin
+try {
+    val product = productClient.load(productId)
+    observerRegistry.recordSuccess("product.load")
+    product
+} catch (primaryException: IOException) {
+    observerRegistry.recordFallback("product.load", primaryException)
+
+    try {
+        productCache.load(productId)
+    } catch (fallbackException: Exception) {
+        observerRegistry.recordFallbackFailure(
+            caseName = "product.load",
+            primaryException = primaryException,
+            fallbackException = fallbackException,
+        )
+        throw primaryException
+    }
+}
+```
+
+If no fallback is applied, call `recordError(caseName, exception)` before rethrowing the exception.
+
 ### `FallbackObserverRegistry`
 
 `FallbackObserverRegistry` owns the observers used by the `FallbackFactory` and all
