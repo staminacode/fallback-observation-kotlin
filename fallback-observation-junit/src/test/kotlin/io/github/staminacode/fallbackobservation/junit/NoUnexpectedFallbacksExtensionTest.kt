@@ -1,7 +1,6 @@
 package io.github.staminacode.fallbackobservation.junit
 
 import io.github.staminacode.fallbackobservation.FallbackFactory
-import io.github.staminacode.fallbackobservation.FallbackObserver
 import io.github.staminacode.fallbackobservation.FallbackObserverRegistry
 import io.github.staminacode.fallbackobservation.invoke
 import java.io.IOException
@@ -115,7 +114,7 @@ class NoUnexpectedFallbacksExtensionTest {
   @Tag("engine-testkit-fixture")
   class PassingFixture {
     companion object {
-      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+      private val registry = FallbackObserverRegistry(emptyList())
 
       @JvmField
       @RegisterExtension
@@ -131,7 +130,7 @@ class NoUnexpectedFallbacksExtensionTest {
   @Tag("engine-testkit-fixture")
   class UnexpectedFallbackFixture {
     companion object {
-      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+      private val registry = FallbackObserverRegistry(emptyList())
 
       @JvmField
       @RegisterExtension
@@ -154,7 +153,7 @@ class NoUnexpectedFallbacksExtensionTest {
   @Tag("engine-testkit-fixture")
   class ExpectedFallbackFixture {
     companion object {
-      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+      private val registry = FallbackObserverRegistry(emptyList())
 
       @JvmField
       @RegisterExtension
@@ -173,7 +172,7 @@ class NoUnexpectedFallbacksExtensionTest {
   @Tag("engine-testkit-fixture")
   class MissingExpectedFallbackFixture {
     companion object {
-      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+      private val registry = FallbackObserverRegistry(emptyList())
 
       @JvmField
       @RegisterExtension
@@ -186,7 +185,7 @@ class NoUnexpectedFallbacksExtensionTest {
   @Tag("engine-testkit-fixture")
   class ExpectedFallbackTwiceFixture {
     companion object {
-      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+      private val registry = FallbackObserverRegistry(emptyList())
 
       @JvmField
       @RegisterExtension
@@ -206,7 +205,7 @@ class NoUnexpectedFallbacksExtensionTest {
   @Tag("engine-testkit-fixture")
   class TooManyFallbacksFixture {
     companion object {
-      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+      private val registry = FallbackObserverRegistry(emptyList())
 
       @JvmField
       @RegisterExtension
@@ -226,7 +225,7 @@ class NoUnexpectedFallbacksExtensionTest {
   @Tag("engine-testkit-fixture")
   class ProgrammaticExpectationFixture {
     companion object {
-      private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+      private val registry = FallbackObserverRegistry(emptyList())
 
       @JvmField
       @RegisterExtension
@@ -248,7 +247,7 @@ class NoUnexpectedFallbacksExtensionTest {
       @JvmField
       @RegisterExtension
       val noUnexpectedFallbacks =
-          NoUnexpectedFallbacksExtension(FallbackObserverRegistry(FallbackObserver.NO_OP))
+          NoUnexpectedFallbacksExtension(FallbackObserverRegistry(emptyList()))
     }
 
     @Test fun succeeds() = Unit
@@ -261,7 +260,7 @@ class NoUnexpectedFallbacksExtensionTest {
       @RegisterExtension
       val noUnexpectedFallbacks =
           NoUnexpectedFallbacksExtension(
-              observerRegistry = FallbackObserverRegistry(FallbackObserver.NO_OP),
+              observerRegistry = FallbackObserverRegistry(emptyList()),
               allowParallelExecution = true,
           )
     }

@@ -75,6 +75,99 @@ class FallbackCaseTest {
     assertSame(exception, events.single().exception)
   }
 
+  @Test
+  fun `notifies fallback aware observers when the primary operation succeeds`() {
+    val successes = mutableListOf<OperationSuccessEvent>()
+    val registry =
+        FallbackObserverRegistry(
+            object : FallbackAwareOperationObserver {
+              override fun onFallback(event: FallbackEvent) = Unit
+
+              override fun onSuccess(event: OperationSuccessEvent) {
+                successes += event
+              }
+            }
+        )
+    val fallbackCase =
+        FallbackFactory(registry).fallbackCase("product.load") { handle<IOException>() }
+
+    fallbackCase.withFallback({ "primary" }, { "fallback" })
+
+    assertEquals(listOf(OperationSuccessEvent("product.load")), successes)
+  }
+
+  @Test
+  fun `notifies operation observers when an error escapes without fallback`() {
+    val errors = mutableListOf<OperationErrorEvent>()
+    val registry = FallbackObserverRegistry(operationObserver(errors))
+    val fallbackCase =
+        FallbackFactory(registry).fallbackCase("product.load") { handle<IOException>() }
+    val exception = IllegalArgumentException("Invalid product")
+
+    assertSame(
+        exception,
+        assertFailsWith {
+          fallbackCase.withFallback(
+              { throw exception },
+              { error("Fallback must not be invoked") },
+          )
+        },
+    )
+
+    assertEquals(listOf(OperationErrorEvent("product.load", exception)), errors)
+  }
+
+  @Test
+  fun `logs a fallback error and reports the original error when the fallback function fails`() {
+    val fallbacks = mutableListOf<FallbackEvent>()
+    val errors = mutableListOf<OperationErrorEvent>()
+    val registry =
+        FallbackObserverRegistry(
+            object : OperationObserver {
+              override fun onFallback(event: FallbackEvent) {
+                fallbacks += event
+              }
+
+              override fun onSuccess(event: OperationSuccessEvent) = Unit
+
+              override fun onError(event: OperationErrorEvent) {
+                errors += event
+              }
+            }
+        )
+    val fallbackCase =
+        FallbackFactory(registry).fallbackCase("product.load") { handle<IOException>() }
+    val primaryException = IOException("Primary unavailable")
+    val fallbackException = IllegalStateException("Cache unavailable")
+
+    assertSame(
+        primaryException,
+        assertFailsWith {
+          fallbackCase.withFallback(
+              { throw primaryException },
+              { throw fallbackException },
+          )
+        },
+    )
+
+    assertEquals(1, fallbacks.size)
+    assertEquals(
+        listOf(OperationErrorEvent("product.load", primaryException, fallbackFailed = true)),
+        errors,
+    )
+  }
+
+  private fun operationObserver(errors: MutableList<OperationErrorEvent>) =
+      object : OperationObserver {
+        override fun onFallback(event: FallbackEvent) = Unit
+
+        override fun onSuccess(event: OperationSuccessEvent) = Unit
+
+        override fun onError(event: OperationErrorEvent) {
+          errors += event
+        }
+      }
+
   private open class ProcessingException : RuntimeException()
 
   private class AuthenticationException : ProcessingException()

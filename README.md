@@ -139,7 +139,18 @@ Use `ResilientOperation<Unit, Output>` for operations without input, then call i
 
 ## Observability
 
-`FallbackObserver` receives a `FallbackEvent` immediately before fallback execution. By default, the core module logs the fallback at warning level, including the triggering exception, through SLF4J. The library includes only `slf4j-api`; the consuming application chooses the logging provider (for example, Logback, Log4j2, or the JUL provider). Configure `FallbackObserver.NO_OP` only when observation should be disabled explicitly.
+`FallbackObserver` receives a `FallbackEvent` immediately before fallback execution. By default, the core module logs the fallback at warning level, including the triggering exception, through SLF4J. The library includes only `slf4j-api`; the consuming application chooses the logging provider (for example, Logback, Log4j2, or the JUL provider). To disable observation explicitly, create the registry with an empty observer collection.
+
+Observers can opt into richer outcome information when they need it:
+
+- `FallbackObserver` receives only executed fallbacks.
+- `FallbackAwareOperationObserver` also receives successful primary operations.
+- `OperationObserver` additionally receives errors that escape without a successful fallback result.
+
+This keeps the default observation lightweight. For example, a fallback-rate observer can implement
+`FallbackAwareOperationObserver`, while an observer that needs to calculate an overall failure rate
+can implement `OperationObserver`. If a fallback function itself fails, the original primary
+exception is reported with `fallbackFailed = true` and rethrown; the fallback exception is logged.
 
 ### `FallbackObserverRegistry`
 

@@ -14,6 +14,25 @@ data class FallbackEvent(
     val exception: Exception,
 )
 
+/** Describes a primary operation that completed successfully. */
+data class OperationSuccessEvent(
+    val caseName: String,
+)
+
+/**
+ * Describes an error that escaped without a successful fallback result.
+ *
+ * @property fallbackFailed Whether a fallback was invoked but failed itself. In that case,
+ *   [exception] is still the original exception from the primary operation; the fallback exception
+ *   is recorded in the application log.
+ */
+data class OperationErrorEvent(
+    val caseName: String,
+    val exception: Exception,
+    val fallbackFailed: Boolean = false,
+)
+
+/** Observes fallbacks immediately before their fallback function is executed. */
 fun interface FallbackObserver {
   fun onFallback(event: FallbackEvent)
 
@@ -26,10 +45,27 @@ fun interface FallbackObserver {
           event.exception,
       )
     }
-
-    /** Disables fallback observation explicitly. */
-    val NO_OP = FallbackObserver {}
   }
+}
+
+/**
+ * Observes successful primary operations as well as fallbacks.
+ *
+ * A fallback is reported through [onFallback], inherited from [FallbackObserver]. A primary
+ * operation that succeeds is reported through [onSuccess]. Errors that escape without a fallback
+ * result are not reported at this level; use [OperationObserver] when they are needed.
+ */
+interface FallbackAwareOperationObserver : FallbackObserver {
+  fun onSuccess(event: OperationSuccessEvent)
+}
+
+/**
+ * Observes every terminal outcome of an operation: primary success, fallback, or an escaped error.
+ *
+ * An error reported through [onError] is one for which no successful fallback result was produced.
+ */
+interface OperationObserver : FallbackAwareOperationObserver {
+  fun onError(event: OperationErrorEvent)
 }
 
 private val logger = LoggerFactory.getLogger(FallbackObserver::class.java)

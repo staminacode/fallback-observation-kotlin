@@ -22,7 +22,7 @@ The registry is an application dependency, so register a configured extension in
 
 ```kotlin
 class ProductServiceTest {
-    private val registry = FallbackObserverRegistry(FallbackObserver.NO_OP)
+    private val registry = FallbackObserverRegistry(emptyList())
     private val fallbackFactory = FallbackFactory(registry)
 
     @JvmField
