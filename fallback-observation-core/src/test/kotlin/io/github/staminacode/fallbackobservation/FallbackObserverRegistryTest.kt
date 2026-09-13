@@ -7,6 +7,54 @@ import kotlin.test.assertEquals
 class FallbackObserverRegistryTest {
 
   @Test
+  fun `closing an old handle again preserves a new registration`() {
+    val events = mutableListOf<Any>()
+    val observer =
+        object : OperationObserver {
+          override fun onFallback(event: FallbackEvent) {
+            events += event
+          }
+
+          override fun onSuccess(event: OperationSuccessEvent) {
+            events += event
+          }
+
+          override fun onError(event: OperationErrorEvent) {
+            events += event
+          }
+        }
+    val registry = FallbackObserverRegistry(emptyList())
+    val original = IOException("Unavailable")
+    fun recordEvents() {
+      registry.recordFallback("product.load", original)
+      registry.recordSuccess("product.load")
+      registry.recordError("product.load", original)
+    }
+
+    val first = registry.register(observer)
+    first.close()
+    recordEvents()
+    assertEquals(emptyList(), events)
+
+    val second = registry.register(observer)
+    first.close()
+    recordEvents()
+    assertEquals(
+        listOf(
+            FallbackEvent("product.load", original),
+            OperationSuccessEvent("product.load"),
+            OperationErrorEvent("product.load", original),
+        ),
+        events,
+    )
+
+    second.close()
+    events.clear()
+    recordEvents()
+    assertEquals(emptyList(), events)
+  }
+
+  @Test
   fun `records manual operation outcomes for the observers that support them`() {
     val fallbacks = mutableListOf<FallbackEvent>()
     val successes = mutableListOf<OperationSuccessEvent>()

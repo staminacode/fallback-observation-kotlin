@@ -1,6 +1,7 @@
 package io.github.staminacode.fallbackobservation
 
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import org.slf4j.LoggerFactory
 
 /**
@@ -29,11 +30,19 @@ class FallbackObserverRegistry(
   /**
    * Registers [observer] and returns a handle that removes it when closed.
    *
-   * The registration is safe to use while fallbacks are being executed.
+   * The registration is safe to use while fallbacks are being executed. Repeated calls to the
+   * handle's `close()` only log a warning; removal occurs once.
    */
   fun register(observer: FallbackObserver): FallbackObserverRegistration {
     add(observer)
-    return FallbackObserverRegistration { remove(observer) }
+    val closed = AtomicBoolean(false)
+    return FallbackObserverRegistration {
+      if (closed.compareAndSet(false, true)) {
+        remove(observer)
+      } else {
+        logger.warn("Registration for observer {} is already closed", observer.javaClass.name)
+      }
+    }
   }
 
   /** Records that a fallback is about to be executed for [caseName]. */
