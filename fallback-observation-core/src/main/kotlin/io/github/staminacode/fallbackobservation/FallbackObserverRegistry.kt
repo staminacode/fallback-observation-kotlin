@@ -36,25 +36,22 @@ class FallbackObserverRegistry(
   /** Records that a fallback is about to be executed for [caseName]. */
   fun recordFallback(caseName: String, exception: Exception) {
     requireCaseName(caseName)
-    fallbackObservers.forEach { observer ->
-      observer.onFallback(FallbackEvent(caseName, exception))
-    }
+    val event = FallbackEvent(caseName, exception)
+    fallbackObservers.forEach { observer -> observer.onFallback(event) }
   }
 
   /** Records a successful primary operation for observers interested in operation outcomes. */
   fun recordSuccess(caseName: String) {
     requireCaseName(caseName)
-    fallbackAwareOperationObservers.forEach { observer ->
-      observer.onSuccess(OperationSuccessEvent(caseName))
-    }
+    val event = OperationSuccessEvent(caseName)
+    fallbackAwareOperationObservers.forEach { observer -> observer.onSuccess(event) }
   }
 
   /** Records an error that escaped without a successful fallback result. */
   fun recordError(caseName: String, exception: Exception) {
     requireCaseName(caseName)
-    operationObservers.forEach { observer ->
-      observer.onError(OperationErrorEvent(caseName, exception))
-    }
+    val event = OperationErrorEvent(caseName, exception)
+    operationObservers.forEach { observer -> observer.onError(event) }
   }
 
   /**
@@ -74,11 +71,8 @@ class FallbackObserverRegistry(
         caseName,
         fallbackException,
     )
-    operationObservers.forEach { observer ->
-      observer.onError(
-          OperationErrorEvent(caseName, primaryException, fallbackFailed = true),
-      )
-    }
+    val event = OperationErrorEvent(caseName, primaryException, fallbackFailed = true)
+    operationObservers.forEach { observer -> observer.onError(event) }
   }
 
   private fun add(observer: FallbackObserver) {
