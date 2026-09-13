@@ -8,6 +8,9 @@ import org.slf4j.LoggerFactory
  *
  * A registry is typically shared by the [FallbackFactory] and all fallback policies created from
  * it. Observers can be registered temporarily, for example by a test extension.
+ *
+ * Exceptions thrown by observer callbacks are logged and do not prevent other observers from
+ * receiving the event or change the operation's outcome. JVM [Error] instances are not intercepted.
  */
 class FallbackObserverRegistry(
     observers: Collection<FallbackObserver> = listOf(FallbackObserver.LOGGING)
@@ -37,21 +40,27 @@ class FallbackObserverRegistry(
   fun recordFallback(caseName: String, exception: Exception) {
     requireCaseName(caseName)
     val event = FallbackEvent(caseName, exception)
-    fallbackObservers.forEach { observer -> observer.onFallback(event) }
+    fallbackObservers.forEach { observer ->
+      notifyObserver(observer, caseName, "onFallback") { observer.onFallback(event) }
+    }
   }
 
   /** Records a successful primary operation for observers interested in operation outcomes. */
   fun recordSuccess(caseName: String) {
     requireCaseName(caseName)
     val event = OperationSuccessEvent(caseName)
-    fallbackAwareOperationObservers.forEach { observer -> observer.onSuccess(event) }
+    fallbackAwareOperationObservers.forEach { observer ->
+      notifyObserver(observer, caseName, "onSuccess") { observer.onSuccess(event) }
+    }
   }
 
   /** Records an error that escaped without a successful fallback result. */
   fun recordError(caseName: String, exception: Exception) {
     requireCaseName(caseName)
     val event = OperationErrorEvent(caseName, exception)
-    operationObservers.forEach { observer -> observer.onError(event) }
+    operationObservers.forEach { observer ->
+      notifyObserver(observer, caseName, "onError") { observer.onError(event) }
+    }
   }
 
   /**
@@ -72,7 +81,28 @@ class FallbackObserverRegistry(
         fallbackException,
     )
     val event = OperationErrorEvent(caseName, primaryException, fallbackFailed = true)
-    operationObservers.forEach { observer -> observer.onError(event) }
+    operationObservers.forEach { observer ->
+      notifyObserver(observer, caseName, "onError") { observer.onError(event) }
+    }
+  }
+
+  private inline fun notifyObserver(
+      observer: FallbackObserver,
+      caseName: String,
+      callback: String,
+      notify: () -> Unit,
+  ) {
+    try {
+      notify()
+    } catch (exception: Exception) {
+      logger.error(
+          "Observer {} failed in {} for case={}",
+          observer.javaClass.name,
+          callback,
+          caseName,
+          exception,
+      )
+    }
   }
 
   private fun add(observer: FallbackObserver) {

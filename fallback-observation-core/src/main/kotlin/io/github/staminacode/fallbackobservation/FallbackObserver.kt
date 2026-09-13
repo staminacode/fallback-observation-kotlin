@@ -32,7 +32,19 @@ data class OperationErrorEvent(
     val fallbackFailed: Boolean = false,
 )
 
-/** Observes fallbacks immediately before their fallback function is executed. */
+/**
+ * Observes fallbacks immediately before their fallback function is executed.
+ *
+ * Callbacks execute synchronously on the calling thread and contribute directly to the operation's
+ * latency. Keep callbacks fast; delegate slow or blocking work to asynchronous processing and
+ * return promptly without waiting for it to finish. The observer is responsible for managing that
+ * processing, including failures that occur after the callback returns.
+ *
+ * When invoked through [FallbackObserverRegistry], any [Exception] escaping a synchronous callback
+ * is caught and logged without changing the operation's outcome or preventing other observers from
+ * receiving the event. JVM [Error] instances are not intercepted. Failures in asynchronous work
+ * remain the observer's responsibility.
+ */
 fun interface FallbackObserver {
   fun onFallback(event: FallbackEvent)
 
@@ -54,6 +66,9 @@ fun interface FallbackObserver {
  * A fallback is reported through [onFallback], inherited from [FallbackObserver]. A primary
  * operation that succeeds is reported through [onSuccess]. Errors that escape without a fallback
  * result are not reported at this level; use [OperationObserver] when they are needed.
+ *
+ * The callback execution, exception isolation, and asynchronous processing contract described in
+ * [FallbackObserver] also applies to [onSuccess].
  */
 interface FallbackAwareOperationObserver : FallbackObserver {
   fun onSuccess(event: OperationSuccessEvent)
@@ -63,6 +78,9 @@ interface FallbackAwareOperationObserver : FallbackObserver {
  * Observes every terminal outcome of an operation: primary success, fallback, or an escaped error.
  *
  * An error reported through [onError] is one for which no successful fallback result was produced.
+ *
+ * The callback execution, exception isolation, and asynchronous processing contract described in
+ * [FallbackObserver] also applies to [onError].
  */
 interface OperationObserver : FallbackAwareOperationObserver {
   fun onError(event: OperationErrorEvent)
