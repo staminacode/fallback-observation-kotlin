@@ -13,14 +13,14 @@ internal class FallbackRules(
         try {
           operation()
         } catch (exception: Exception) {
-          return recover(exception, fallback)
+          return handleException(exception, fallback)
         }
 
     observerRegistry.recordSuccess(caseName)
     return result
   }
 
-  private fun <O> recover(exception: Exception, fallback: (Exception) -> O): O =
+  private fun <O> handleException(exception: Exception, fallback: (Exception) -> O): O =
       when {
         exception.matches(passThroughExceptions) -> rethrow(exception)
         exception.matches(handledExceptions) -> executeFallback(exception, fallback)
