@@ -9,6 +9,26 @@
   JUnit Jupiter tests.
 - `fallback-observation-micrometer` provides a Micrometer-backed `FallbackObserver`.
 
+## Create a factory
+
+Create `FallbackCase` and `ResilientOperation` instances through a `FallbackFactory`. The factory
+connects them to a shared `FallbackObserverRegistry`, where observers are configured once:
+
+```kotlin
+val observerRegistry = FallbackObserverRegistry(
+    listOf(
+        FallbackObserver.LOGGING,
+        MicrometerFallbackObserver(meterRegistry),
+    ),
+)
+
+val fallbackFactory = FallbackFactory(observerRegistry)
+```
+
+This configuration enables logging and Micrometer metrics for the examples below. Use
+`FallbackObserverRegistry()` for logging only, or `FallbackObserverRegistry(emptyList())` for no
+registered observers. Keep the registry and factory as long-lived application dependencies.
+
 ## `FallbackCase` vs. `ResilientOperation`
 
 Both types apply the same exception rules and notify a `FallbackObserver` immediately before a fallback is executed. The difference is where the primary operation and fallback function are defined.
@@ -56,18 +76,15 @@ try {
 }
 ```
 
-`FallbackCase` extracts the exception rules and observers, but keeps both functions adjacent to the call. This
-is a good fit when the wrapped call needs several independent parameters:
+#### Using `FallbackCase`
+
+`FallbackCase` keeps the name and exception rules in a reusable policy connected to the factory's
+registry. The primary and fallback functions are supplied at the call site, so the same policy can
+be used with different implementations:
 
 ```kotlin
-val productLoadFallback = fallbackCase("product.load") {
+val productLoadFallback = fallbackFactory.fallbackCase("product.load") {
     handle<IOException>()
-    observer(
-        CompositeFallbackObserver(
-            FallbackObserver.LOGGING,
-            MicrometerFallbackObserver(meterRegistry),
-        ),
-    )
 }
 
 val product = productLoadFallback.withFallback(
@@ -76,53 +93,17 @@ val product = productLoadFallback.withFallback(
 )
 ```
 
-`ResilientOperation` keeps the configured behaviour reusable and makes the single input explicit:
+#### Using `ResilientOperation`
+
+`ResilientOperation` captures both functions when it is created through the same factory. It behaves
+like a function through Kotlin's `invoke` operator, making repeated calls with one input concise:
 
 ```kotlin
-val loadProduct = resilientOperation<ProductId, Product>("product.load") {
+val loadProduct = fallbackFactory.resilientOperation<ProductId, Product>("product.load") {
     operation(productClient::load)
     fallback { productId, _ -> productCache.load(productId) }
 
     handle<IOException>()
-    observer(
-        CompositeFallbackObserver(
-            FallbackObserver.LOGGING,
-            MicrometerFallbackObserver(meterRegistry),
-        ),
-    )
-}
-
-val product = loadProduct(productId)
-```
-
-### Use `FallbackCase` for a reusable policy
-
-`FallbackCase` owns the name, exception rules, and observer. The actual primary and fallback functions remain local to each use. This works well when multiple calls share a policy but not the same implementation.
-
-```kotlin
-val productLoadFallback = fallbackCase("product.load") {
-    handle<IOException>()
-    passThrough<AuthenticationException>()
-    observer(metricsObserver)
-}
-
-val product = productLoadFallback.withFallback(
-    operation = { productClient.load(productId) },
-    fallback = { productCache.load(productId) },
-)
-```
-
-### Use `ResilientOperation` for a configured operation
-
-`ResilientOperation` captures the primary operation and fallback function when it is built. It behaves like a function through Kotlin's `invoke` operator, which makes repeated calls concise and keeps the configuration in one place.
-
-```kotlin
-val loadProduct = resilientOperation<ProductId, Product>("product.load") {
-    operation(productClient::load)
-    fallback { productId, _ -> productCache.load(productId) }
-
-    handle<IOException>()
-    observer(metricsObserver)
 }
 
 val product = loadProduct(productId)
@@ -183,19 +164,9 @@ If no fallback is applied, call `recordError(caseName, exception)` before rethro
 ### `FallbackObserverRegistry`
 
 `FallbackObserverRegistry` owns the observers used by the `FallbackFactory` and all
-`FallbackCase` and `ResilientOperation` instances created by that factory. Create the registry and
-factory once as part of the application object graph:
-
-```kotlin
-val observerRegistry = FallbackObserverRegistry(
-    listOf(
-        FallbackObserver.LOGGING,
-        MicrometerFallbackObserver(meterRegistry),
-    ),
-)
-
-val fallbackFactory = FallbackFactory(observerRegistry)
-```
+`FallbackCase` and `ResilientOperation` instances created by that factory, as shown in
+[Create a factory](#create-a-factory). Changes to the registry also apply to policies that have
+already been created.
 
 The Micrometer observer records a `fallback.executions` counter tagged with `fallback.case` and
 `exception`.
