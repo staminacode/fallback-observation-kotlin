@@ -62,13 +62,13 @@ keeps the control flow local, but it duplicates the logging and metric-recording
 ```kotlin
 try {
     productClient.load(productId)
-} catch (exception: IOException) {
-    logger.warn("Executing fallback for case={}", "product.load", exception)
+} catch (primaryException: IOException) {
+    logger.warn("Executing fallback for case={}", "product.load", primaryException)
 
     Counter.builder("fallback.executions")
         .description("Number of fallback executions")
         .tag("fallback.case", "product.load")
-        .tag("exception", exception.javaClass.name)
+        .tag("exception", primaryException.javaClass.name)
         .register(meterRegistry)
         .increment()
 
@@ -83,11 +83,11 @@ registry. The primary and fallback functions are supplied at the call site, so t
 be used with different implementations:
 
 ```kotlin
-val productLoadFallback = fallbackFactory.fallbackCase("product.load") {
+val productLoadPolicy = fallbackFactory.fallbackCase("product.load") {
     handle<IOException>()
 }
 
-val product = productLoadFallback.withFallback(
+val product = productLoadPolicy.withFallback(
     operation = { productClient.load(productId) },
     fallback = { productCache.load(productId) },
 )
@@ -99,14 +99,14 @@ val product = productLoadFallback.withFallback(
 like a function through Kotlin's `invoke` operator, making repeated calls with one input concise:
 
 ```kotlin
-val loadProduct = fallbackFactory.resilientOperation<ProductId, Product>("product.load") {
+val loadProductWithFallback = fallbackFactory.resilientOperation<ProductId, Product>("product.load") {
     operation(productClient::load)
     fallback { productId, _ -> productCache.load(productId) }
 
     handle<IOException>()
 }
 
-val product = loadProduct(productId)
+val product = loadProductWithFallback(productId)
 ```
 
 Use `ResilientOperation<Unit, Output>` for operations without input, then call it as `operation()`.
@@ -176,11 +176,11 @@ removes only that observer when closed. This is useful for scoped integrations s
 extension:
 
 ```kotlin
-val registration = observerRegistry.register(auditObserver)
+val auditRegistration = observerRegistry.register(auditObserver)
 try {
     // Execute work observed by auditObserver.
 } finally {
-    registration.close()
+    auditRegistration.close()
 }
 ```
 
