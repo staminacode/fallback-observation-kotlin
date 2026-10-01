@@ -29,5 +29,8 @@ class FallbackCase internal constructor(private val rules: FallbackRules) {
  * operation name such as `product.load`; never include request IDs, user IDs, tenant IDs, or other
  * unbounded values.
  */
-class FallbackCaseBuilder internal constructor(observerRegistry: FallbackObserverRegistry) :
-    AbstractFallbackBuilder(observerRegistry)
+class FallbackCaseBuilder
+internal constructor(
+    observerRegistry: FallbackObserverRegistry,
+    primaryOperationHook: PrimaryOperationHook?,
+) : AbstractFallbackBuilder(observerRegistry, primaryOperationHook)

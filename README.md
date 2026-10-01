@@ -29,6 +29,42 @@ This configuration enables logging and Micrometer metrics for the examples below
 `FallbackObserverRegistry()` for logging only, or `FallbackObserverRegistry(emptyList())` for no
 registered observers. Keep the registry and factory as long-lived application dependencies.
 
+### Customize primary execution
+
+Optionally supply a `PrimaryOperationHook` to the factory to select direct fallback execution or
+inject latency and failures. The callback receives the stable case name
+before each invocation, so the application can choose its own mechanism, such as a feature toggle:
+
+```kotlin
+val fallbackFactory = FallbackFactory(
+    observerRegistry,
+    primaryOperationHook = PrimaryOperationHook { caseName ->
+        if (featureFlags.isEnabled("fallback-direct.$caseName")) {
+            PrimaryOperationDecision.EXECUTE_FALLBACK
+        } else {
+            PrimaryOperationDecision.PROCEED
+        }
+    },
+)
+```
+
+Returning `EXECUTE_FALLBACK` skips the primary operation and executes the fallback regardless of the configured
+exception rules. Returning `PROCEED` uses the normal flow. When this parameter is omitted, no hook
+callback is called. The fallback receives `PrimaryOperationBypassedException` in place of a primary
+exception; it is a signal, not an error thrown by the primary operation. If that fallback fails, its
+own exception escapes. Exceptions thrown by the hook follow the same `handle` and `passThrough`
+rules as primary exceptions; the primary operation is not called after an injected failure.
+
+The hook runs synchronously, so intentional delays can exercise a deadline covering the invocation
+or a deadline check performed afterward by the primary operation. Such delays do not consume a
+client's internal request timeout before that client call starts.
+
+Fallback events identify this path with `origin = PRIMARY_BYPASS`; normal exceptions use
+`PRIMARY_EXCEPTION`. The Micrometer observer tags the bypass path with `origin=PRIMARY_BYPASS` and
+`exception=none`. This factory configuration applies to `FallbackCase` and `ResilientOperation`
+instances it creates, including instances reused across calls. Manual `try`/`catch` calls through
+the observer registry do not consult the hook.
+
 ## `FallbackCase` vs. `ResilientOperation`
 
 Both types apply the same exception rules and notify a `FallbackObserver` immediately before a fallback is executed. The difference is where the primary operation and fallback function are defined.
@@ -168,8 +204,8 @@ If no fallback is applied, call `recordError(caseName, exception)` before rethro
 [Create a factory](#create-a-factory). Changes to the registry also apply to policies that have
 already been created.
 
-The Micrometer observer records a `fallback.executions` counter tagged with `fallback.case` and
-`exception`.
+The Micrometer observer records a `fallback.executions` counter tagged with `fallback.case`,
+`exception`, and `origin`.
 
 Observers can also be registered temporarily. `register` returns an `AutoCloseable` handle that
 removes only that observer when closed. This is useful for scoped integrations such as the JUnit

@@ -22,8 +22,10 @@ internal constructor(
 }
 
 class ResilientOperationBuilder<I, O>
-internal constructor(observerRegistry: FallbackObserverRegistry) :
-    AbstractFallbackBuilder(observerRegistry) {
+internal constructor(
+    observerRegistry: FallbackObserverRegistry,
+    primaryOperationHook: PrimaryOperationHook?,
+) : AbstractFallbackBuilder(observerRegistry, primaryOperationHook) {
   private var configuredOperation: ((I) -> O)? = null
   private var configuredFallback: ((I, Exception) -> O)? = null
 

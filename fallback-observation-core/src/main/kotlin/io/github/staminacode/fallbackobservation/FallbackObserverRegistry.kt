@@ -47,8 +47,16 @@ class FallbackObserverRegistry(
 
   /** Records that a fallback is about to be executed for [caseName]. */
   fun recordFallback(caseName: String, exception: Exception) {
+    recordFallbackEvent(FallbackEvent(caseName, exception))
+  }
+
+  internal fun recordBypassedFallback(caseName: String, bypass: PrimaryOperationBypassedException) {
+    recordFallbackEvent(FallbackEvent(caseName, bypass, FallbackOrigin.PRIMARY_BYPASS))
+  }
+
+  private fun recordFallbackEvent(event: FallbackEvent) {
+    val caseName = event.caseName
     requireCaseName(caseName)
-    val event = FallbackEvent(caseName, exception)
     fallbackObservers.forEach { observer ->
       notifyObserver(observer, caseName, "onFallback") { observer.onFallback(event) }
     }
@@ -90,6 +98,22 @@ class FallbackObserverRegistry(
         fallbackException,
     )
     val event = OperationErrorEvent(caseName, primaryException, fallbackFailed = true)
+    operationObservers.forEach { observer ->
+      notifyObserver(observer, caseName, "onError") { observer.onError(event) }
+    }
+  }
+
+  internal fun recordBypassedFallbackFailure(
+      caseName: String,
+      fallbackException: Exception,
+  ) {
+    requireCaseName(caseName)
+    logger.error(
+        "Fallback failed after bypassing primary operation for case={}",
+        caseName,
+        fallbackException,
+    )
+    val event = OperationErrorEvent(caseName, fallbackException, fallbackFailed = true)
     operationObservers.forEach { observer ->
       notifyObserver(observer, caseName, "onError") { observer.onError(event) }
     }

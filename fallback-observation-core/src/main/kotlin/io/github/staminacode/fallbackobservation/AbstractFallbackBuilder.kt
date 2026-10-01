@@ -2,7 +2,10 @@ package io.github.staminacode.fallbackobservation
 
 import kotlin.reflect.KClass
 
-abstract class AbstractFallbackBuilder(private val observerRegistry: FallbackObserverRegistry) {
+abstract class AbstractFallbackBuilder(
+    private val observerRegistry: FallbackObserverRegistry,
+    private val primaryOperationHook: PrimaryOperationHook?,
+) {
   private val handledExceptions = linkedSetOf<KClass<out Exception>>()
   private val passThroughExceptions = linkedSetOf<KClass<out Exception>>()
 
@@ -32,6 +35,7 @@ abstract class AbstractFallbackBuilder(private val observerRegistry: FallbackObs
         handledExceptions.toSet(),
         passThroughExceptions.toSet(),
         observerRegistry,
+        primaryOperationHook,
     )
   }
 }

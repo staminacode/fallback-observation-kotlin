@@ -8,11 +8,20 @@ import org.slf4j.LoggerFactory
  * @property caseName A stable, logical fallback name. When an observer exports this value as a
  *   metric tag, use a small, bounded set of names such as `product.load`. Do not include request
  *   IDs, user IDs, tenant IDs, or other unbounded values, as they create high-cardinality metrics.
+ * @property exception The primary exception, or [PrimaryOperationBypassedException] when [origin]
+ *   is [FallbackOrigin.PRIMARY_BYPASS].
  */
 data class FallbackEvent(
     val caseName: String,
     val exception: Exception,
+    val origin: FallbackOrigin = FallbackOrigin.PRIMARY_EXCEPTION,
 )
+
+/** Indicates whether a fallback was caused by a primary exception or an explicit bypass. */
+enum class FallbackOrigin {
+  PRIMARY_EXCEPTION,
+  PRIMARY_BYPASS,
+}
 
 /** Describes a primary operation that completed successfully. */
 data class OperationSuccessEvent(
@@ -23,8 +32,8 @@ data class OperationSuccessEvent(
  * Describes an error that escaped without a successful fallback result.
  *
  * @property fallbackFailed Whether a fallback was invoked but failed itself. In that case,
- *   [exception] is still the original exception from the primary operation; the fallback exception
- *   is recorded in the application log.
+ *   [exception] is the original primary exception when one exists, or the fallback exception when
+ *   the primary operation was bypassed.
  */
 data class OperationErrorEvent(
     val caseName: String,
@@ -51,11 +60,18 @@ fun interface FallbackObserver {
   companion object {
     /** Logs each fallback at warning level, including the exception that triggered it. */
     val LOGGING = FallbackObserver { event ->
-      logger.warn(
-          "Executing fallback for case={}",
-          event.caseName,
-          event.exception,
-      )
+      if (event.origin == FallbackOrigin.PRIMARY_BYPASS) {
+        logger.warn(
+            "Executing fallback after bypassing primary operation for case={}",
+            event.caseName,
+        )
+      } else {
+        logger.warn(
+            "Executing fallback for case={}",
+            event.caseName,
+            event.exception,
+        )
+      }
     }
   }
 }
